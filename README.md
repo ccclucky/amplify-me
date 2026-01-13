@@ -1,20 +1,69 @@
 <div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
+  <img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
 </div>
 
-# Run and deploy your AI Studio app
+# Amplify Me（AI Studio 应用）
 
-This contains everything you need to run your app locally.
+Amplify Me 是一个面向创作者与产品团队的 AI Studio 应用，目标是把“想法→可执行方案→可落地交付”的链路压缩到最短。它强调**强意图识别、结构化输出、以及可持续迭代的协作体验**，让每一次对话都能沉淀为可复用的资产。
 
-View your app in AI Studio: https://ai.studio/apps/drive/1fJ4apkf_Dd0onQhdrJxPAjYlC2vvFIZL
+## 项目亮点（评审维度说明）
 
-## Run Locally
+本作品将从**实用性、创意性、技术深度**三个维度独立评分，以下说明帮助评委快速理解项目价值：
 
-**Prerequisites:**  Node.js
+- **实用性**：针对真实工作流场景（需求澄清、内容规划、执行清单生成等），提供可直接执行的结构化交付，减少“只停留在想法”的落地损耗。
+- **创意性**：以“多 Agent 协作 + 角色分工”的方式重塑对话生产力，使复杂任务能被拆分、并行与收敛，提供更接近团队协作的体验。
+- **技术深度**：通过协调器与专家 Agent 的任务拆解与结果整合机制，强化一致性校验与上下文沉淀，提升长链路任务的稳定性与可控性。
 
+## 产品理念
 
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+- **以结果为中心**：输出不仅是文本回答，更是可以直接执行的计划、清单与行动建议。
+- **以协作为核心**：通过 Agent 之间的分工协作，把复杂问题拆解为高质量子任务。
+- **以可复用为目标**：将高频场景与流程模板化，提升复用效率与交付一致性。
+
+## 核心功能
+
+- **多轮意图澄清**：在关键信息不完整时主动追问，避免输出偏离需求。
+- **结构化交付**：以步骤、清单、表格等形式输出，便于直接执行与追踪。
+- **多 Agent 协作**：面向策略、写作、执行等不同角色分配任务并汇总结果。
+- **上下文记忆与复用**：沉淀会话上下文，支持跨轮次持续优化。
+
+## Agent 架构
+
+Amplify Me 采用“协调器 + 专家 Agent”的协作架构：
+
+1. **协调器（Coordinator）**
+   - 负责理解用户目标、拆分任务、分配角色、收敛最终输出。
+2. **专家 Agent（Specialists）**
+   - 根据任务类型提供专业能力，例如内容策略、文案生成、行动计划、数据结构化等。
+3. **结果汇总与校验**
+   - 将多 Agent 结果合并，进行一致性检查与格式化输出。
+
+该架构让复杂问题能够并行处理，同时保持输出的稳定性与可控性。
+
+## 使用方法
+
+### 本地运行
+
+**前置条件：** Node.js
+
+1. 安装依赖：
+   ```bash
+   npm install
+   ```
+2. 配置环境变量：
+   在 [.env.local](.env.local) 中设置 `GEMINI_API_KEY`。
+3. 启动开发服务器：
+   ```bash
+   npm run dev
+   ```
+
+### 在线体验
+
+在 AI Studio 中查看应用：
+https://amplify-me.a83a9bef.er.aliyun-esa.net/
+
+## 致谢
+
+本项目由阿里云ESA提供加速、计算和保护。
+
+![阿里云ESA](https://img.alicdn.com/imgextra/i3/O1CN01H1UU3i1Cti9lYtFrs_!!6000000000139-2-tps-7534-844.png)
