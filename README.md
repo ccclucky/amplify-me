@@ -60,7 +60,7 @@ Amplify Me 采用“协调器 + 专家 Agent”的协作架构：
 ### 在线体验
 
 在 AI Studio 中查看应用：
-https://ai.studio/apps/drive/1fJ4apkf_Dd0onQhdrJxPAjYlC2vvFIZL
+https://amplify-me.a83a9bef.er.aliyun-esa.net/
 
 ## 致谢
 
