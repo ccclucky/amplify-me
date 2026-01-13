@@ -1,0 +1,117 @@
+
+export const translations = {
+  en: {
+    app_name: "AmplifyMe",
+    slogan: "Don't rewrite life, just amplify the expression.",
+    clear_all: "Start Over",
+    confirm_clear: "Are you sure you want to clear everything?",
+    step_1: "1. Upload Memories",
+    step_1_sub: "Max 9 images",
+    drag_drop: "Click or Drag images here",
+    click_drag: "Click or Drag",
+    step_2: "2. Say Something",
+    placeholder: "Don't overthink, e.g., 'Tired today, but the sunset is nice...'",
+    step_3: "3. Current Mood",
+    moods: {
+      happy: "😄 Happy",
+      tired: "😫 Tired",
+      sad: "🌧️ Sad",
+      calm: "🍃 Calm",
+      anxious: "😰 Anxious",
+      grateful: "🙏 Grateful",
+      proud: "😎 Proud"
+    },
+    step_4: "4. Intent",
+    intents: {
+      just_record: "📷 Just Record",
+      show_off: "✨ Show Off",
+      seek_empathy: "🫂 Seek Empathy",
+      vent: "💢 Vent"
+    },
+    step_5: "5. Platform",
+    platforms: {
+      wechat: "WeChat",
+      xhs: "RedNote"
+    },
+    advanced_opt: "Advanced Optimization",
+    advanced_sub: "AI Quality Check",
+    advanced_desc: "Enable full image refinement & safety check (Slower)",
+    submit_btn: "✨ Generate",
+    loading_text: "Organizing memories...",
+    loading_update: "Updating options...",
+    result_empty: "Input on left, Amplify on right",
+    original: "Original",
+    copy_btn: "Copy Text",
+    copied: "Copied",
+    save_img: "Save Image",
+    generating: "Generating...",
+    refine_placeholder: "Refine text or image...",
+    refine_modes: {
+      more_literary: "Literary",
+      more_realistic: "Realistic",
+      lighter: "Lighter"
+    },
+    preview_mode: "Preview Mode",
+    ai_enhanced: "AI Enhanced",
+    follow: "Follow",
+    say_something: "Say something...",
+    generated_placeholder: "✨ Generated content will appear here"
+  },
+  zh: {
+    app_name: "AmplifyMe",
+    slogan: "不改写人生，只美化表达。",
+    clear_all: "清空重来",
+    confirm_clear: "确定要清空所有内容重新开始吗？",
+    step_1: "1. 放入记忆碎片",
+    step_1_sub: "最多9张",
+    drag_drop: "点击或拖入图片",
+    click_drag: "点击或拖入",
+    step_2: "2. 随便说点什么",
+    placeholder: "不用想太多，比如：今天好累，但晚霞很美...",
+    step_3: "3. 此刻心情",
+    moods: {
+      happy: "😄 开心",
+      tired: "😫 很累",
+      sad: "🌧️ 低落",
+      calm: "🍃 平静",
+      anxious: "😰 焦虑",
+      grateful: "🙏 感恩",
+      proud: "😎 得意"
+    },
+    step_4: "4. 为什么想发？",
+    intents: {
+      just_record: "📷 只是记录",
+      show_off: "✨ 炫耀一下",
+      seek_empathy: "🫂 求安慰",
+      vent: "💢 发泄一下"
+    },
+    step_5: "5. 发在哪里？",
+    platforms: {
+      wechat: "朋友圈",
+      xhs: "小红书"
+    },
+    advanced_opt: "高级优化",
+    advanced_sub: "AI 质检",
+    advanced_desc: "开启后将全图精修并进行安全检查（稍慢）",
+    submit_btn: "✨ 生成方案",
+    loading_text: "正在整理回忆...",
+    loading_update: "正在更新方案...",
+    result_empty: "左侧输入，右侧放大",
+    original: "Original",
+    copy_btn: "复制文案",
+    copied: "已复制",
+    save_img: "保存图片",
+    generating: "生成中...",
+    refine_placeholder: "想怎么改图或文案？",
+    refine_modes: {
+      more_literary: "更文艺",
+      more_realistic: "更真实",
+      lighter: "更轻盈"
+    },
+    preview_mode: "预览模式",
+    ai_enhanced: "AI精修",
+    follow: "关注",
+    say_something: "说点什么…",
+    generated_placeholder: "✨ 生成后在此显示"
+  }
+};
