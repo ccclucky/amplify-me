@@ -67,9 +67,16 @@ export class LLMRouter {
     return res.text || "";
   }
 
-  async callImageGen(prompt: string, base64Image: string): Promise<string | null> {
+  async callImageGen(prompt: string, base64Image: string, referenceImages: string[] = []): Promise<string | null> {
     const spec = this.getSpec('IMAGE_GEN');
-    const parts = [{ inlineData: { mimeType: 'image/png', data: base64Image.split(',')[1] } }, { text: prompt }];
+    const referenceParts = referenceImages.map((image) => ({
+      inlineData: { mimeType: 'image/png', data: image.split(',')[1] }
+    }));
+    const parts = [
+      { inlineData: { mimeType: 'image/png', data: base64Image.split(',')[1] } },
+      ...referenceParts,
+      { text: prompt }
+    ];
     const res = await this.ai.models.generateContent({ model: spec.model, contents: [{ role: 'user', parts }], config: { temperature: spec.temperature, topP: spec.topP, topK: spec.topK } });
     for (const part of res.candidates[0].content.parts) {
       if (part.inlineData) return `data:image/png;base64,${part.inlineData.data}`;

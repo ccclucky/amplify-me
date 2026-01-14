@@ -12,6 +12,7 @@ import { runSanityCheck } from './tests/orchestrator.test';
 const App: React.FC = () => {
   const [request, setRequest] = useState<UserRequest>({
     images: [],
+    reference_images: [],
     raw_text: '',
     platform: 'wechat_moments',
     mood_user: 'tired',
@@ -109,6 +110,7 @@ const App: React.FC = () => {
   const handleReset = () => {
     setRequest({
       images: [],
+      reference_images: [],
       raw_text: '',
       platform: 'wechat_moments',
       mood_user: 'tired',

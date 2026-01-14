@@ -46,39 +46,33 @@ function base64ToGenerativePart(base64DataUrl: string) {
 // ==========================================
 // V3 AGGRESSIVE NEGATIVES
 // ==========================================
-const NANO_NEGATIVE_V3 = "floating light orbs, artificial bokeh dots, random light spots, sticker-like bokeh, lens flare stickers, blurry smudges, ghosting, teal cast in blacks, plastic skin, distorted fingers, text on screen becoming gibberish, messy wires, domestic clutter, tissues, trash, watermarks.";
+const NANO_NEGATIVE_V3 = "floating bokeh dots, random light spots, lens flare stickers, plastic skin, distorted fingers, text gibberish, clutter, watermarks.";
 
 // ==========================================
 // 1. PROMPTS (V3 Structural Logic)
 // ==========================================
 
 const UNDERSTANDING_SYSTEM = `
-You are a Technical Photography Director. 
-Analyze the image layers:
-1. Subject: What is the focus? (e.g., a hand, a screen, a person)
-2. Primary Light: Where is light coming from? (e.g., monitor glow)
-3. Background Clutter: What must be hidden in shadows? (e.g., cables, tissues)
-Search for "Low-key cinematography" and "product lighting" for inspiration.
+You are a Technical Photography Director.
+Identify:
+1. Subject focus
+2. Primary light source
+3. Background clutter to hide
 `;
 
 const DIRECTOR_SYSTEM = `
-You are a Master Colorist and Cinematographer. 
-Your goal is to "Relight and Re-surface" the scene while preserving structure.
+You are a cinematic retoucher. Preserve structure and realism.
+Rules:
+- If a screen exists, use it as the key light with cyan/blue spill.
+- Clean the background into deep, tidy shadows or matte black surfaces.
+- No floating dots/orbs or fake bokeh. No distortions.
 
-**V3 Execution Rules**:
-- **PHYSICAL LIGHTING**: If there is a screen, it MUST be the only primary light source. Add "Cyan/Blue/White glow spill" from the screen onto the nearby surfaces (hands, desk).
-- **STRUCTURE PRESERVATION**: Do NOT add random dots or orbs. Lighting must follow the geometry of the objects.
-- **SURFACE REWRITE**: Change all messy/domestic surfaces (desks with clutter) into "Polished dark obsidian" or "Deep matte black" to hide mess.
-- **ATMOSPHERE**: Use "Anamorphic cinematic style", "High dynamic range", "Deep moody shadows", "Professional color grade".
-
-**Golden Prompt Template**:
-"A professional cinematic re-rendering of this photo. 
-LAYER 1 (Subject): Preserve the sharp contours and details of the [SUBJECT].
-LAYER 2 (Lighting): Use the screen as a high-intensity key light. Apply realistic blue/cyan light spill and rim lighting to the subject's edges. 
-LAYER 3 (Environment): Drown all background clutter and domestic items in deep, rich, clean black shadows (Chiaroscuro). Rewrite the desk surface as a clean, dark reflective material.
-STRICTLY FORBID: No floating light spots, no artificial bokeh dots, no stickers.
-
-Color Grade: Balanced neutral-warm skin tones, cinematic cool shadows, zero green tint."
+Template:
+"Cinema-grade relight.
+Subject: [SUBJECT].
+Lighting: screen-led key light with realistic spill.
+Environment: clean dark background, remove clutter, matte/obsidian surfaces.
+Color: neutral skin, cool shadows, high contrast."
 
 Negative: ${NANO_NEGATIVE_V3}
 `;
@@ -93,11 +87,12 @@ REJECT IF:
 Verdict 'OK' only if it looks like a clean movie frame.
 `;
 
-function validateAndConstructPrompt(plan: DirectorImagePlan, platform: string, subject: string): string {
+function validateAndConstructPrompt(plan: DirectorImagePlan, platform: string, subject: string, referenceCount: number): string {
     const p = plan.nano_prompt_en_v2 || "";
     // Inject subject into the structural template
     const finalPrompt = p.replace("[SUBJECT]", subject || "primary subject");
-    return finalPrompt + `\n[ACTION]: Clean the desk, unify the shadows, and ensure the screen light looks physically real. Target: ${platform} Premium Look.`;
+    const referenceNote = referenceCount > 0 ? "Use reference images for lighting and material style." : "";
+    return `${finalPrompt}\n[ACTION]: Clean shadows, keep light physically real. Target: ${platform} premium look. ${referenceNote}`.trim();
 }
 
 // ==========================================
@@ -162,7 +157,8 @@ async function runVisualDirector(req: UserRequest, understanding: UnderstandingO
     
     for (const plan of res.images) {
         const sub = understanding.per_image.find(p => p.image_index === plan.image_index)?.what_matters[0] || "subject";
-        plan.nano_prompt_en_v2 = validateAndConstructPrompt(plan, req.platform, sub);
+        const referenceCount = req.reference_images?.length || 0;
+        plan.nano_prompt_en_v2 = validateAndConstructPrompt(plan, req.platform, sub, referenceCount);
     }
     return res;
 }
@@ -184,6 +180,9 @@ export async function runOrchestrator(req: UserRequest): Promise<OrchestratorRes
     const traceId = req.traceId || generateTraceId();
     const llm = new LLMRouter(req, traceId);
     const originalBase64 = await Promise.all(req.images.map(fileToDataURL));
+    const referenceBase64 = req.reference_images
+        ? await Promise.all(req.reference_images.map(fileToDataURL))
+        : [];
 
     try {
         const understanding = await runUnderstanding(req, llm);
@@ -196,7 +195,7 @@ export async function runOrchestrator(req: UserRequest): Promise<OrchestratorRes
             const plan = directorOut.images.find(p => p.image_index === i);
             if (!plan) continue;
 
-            let resultImg = await llm.callImageGen(plan.nano_prompt_en_v2, originalBase64[i]);
+            let resultImg = await llm.callImageGen(plan.nano_prompt_en_v2, originalBase64[i], referenceBase64);
 
             if (resultImg) {
                 const guard = await runFastGuardrail(i, originalBase64[i], resultImg, llm);
@@ -205,7 +204,7 @@ export async function runOrchestrator(req: UserRequest): Promise<OrchestratorRes
                 if (!guard.pass) {
                     console.warn(`[V3 RESCUE] Rejecting hallucinations/weakness. Retrying with STRICT PHYSICS.`);
                     const rescuePrompt = plan.nano_prompt_en_v2 + "\n[STRICT]: ELIMINATE ALL FLOATING DOTS. Deepen shadows to black. Make the screen light the ONLY light.";
-                    const rescueImg = await llm.callImageGen(rescuePrompt, originalBase64[i]);
+                    const rescueImg = await llm.callImageGen(rescuePrompt, originalBase64[i], referenceBase64);
                     if (rescueImg) resultImg = rescueImg;
                 }
             }

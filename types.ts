@@ -11,6 +11,7 @@
 
 export interface UserRequest {
   images: File[];
+  reference_images?: File[];
   raw_text: string;
   platform: 'wechat_moments' | 'xiaohongshu';
   mood_user: 'happy' | 'tired' | 'sad' | 'calm' | 'anxious' | 'grateful' | 'proud';
