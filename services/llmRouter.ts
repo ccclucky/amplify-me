@@ -48,6 +48,14 @@ export class LLMRouter {
   public getMode(): Mode { return this.mode; }
   public getTraces(): LLMTraceRecord[] { return this.traces; }
   public getSpec(agentId: AgentId): ModelSpec { return MODEL_MATRIX[this.mode][agentId]!; }
+  public getSpecForMode(mode: Mode, agentId: AgentId): ModelSpec | null { return MODEL_MATRIX[mode][agentId]; }
+
+  private extractTextFromResponse(res: any): string {
+    if (res?.text) return res.text;
+    const parts = res?.candidates?.[0]?.content?.parts;
+    if (!parts) return "";
+    return parts.map((part: { text?: string }) => part.text).filter(Boolean).join("\n");
+  }
 
   async callJson<T>(agentId: AgentId, contents: any[], systemInstruction: string, schema: any): Promise<T> {
     const spec = this.getSpec(agentId);
@@ -57,30 +65,48 @@ export class LLMRouter {
       config: { temperature: spec.temperature, responseMimeType: 'application/json', responseSchema: schema, systemInstruction, tools: spec.tools }
     });
     this.traces.push({ agent: agentId, mode: this.mode, model: spec.model, temperature: spec.temperature, retriesUsed: 0, durationMs: 0, ok: true });
-    return JSON.parse(res.text.replace(/```json/g, '').replace(/```/g, '').trim()) as T;
+    const text = this.extractTextFromResponse(res);
+    if (!text) {
+      throw new Error(`[LLMRouter] Empty JSON response for ${agentId}`);
+    }
+    return JSON.parse(text.replace(/```json/g, '').replace(/```/g, '').trim()) as T;
   }
 
   async callText(agentId: AgentId, contents: any[], systemInstruction: string): Promise<string> {
     const spec = this.getSpec(agentId);
     const res = await this.ai.models.generateContent({ model: spec.model, contents, config: { temperature: spec.temperature, systemInstruction } });
     this.traces.push({ agent: agentId, mode: this.mode, model: spec.model, temperature: spec.temperature, retriesUsed: 0, durationMs: 0, ok: true });
-    return res.text || "";
+    return this.extractTextFromResponse(res);
   }
 
-  async callImageGen(prompt: string, base64Image: string, referenceImages: string[] = []): Promise<string | null> {
-    const spec = this.getSpec('IMAGE_GEN');
+  private buildImageParts(prompt: string, base64Image: string, referenceImages: string[]) {
     const referenceParts = referenceImages.map((image) => ({
       inlineData: { mimeType: 'image/png', data: image.split(',')[1] }
     }));
-    const parts = [
+    return [
       { inlineData: { mimeType: 'image/png', data: base64Image.split(',')[1] } },
       ...referenceParts,
       { text: prompt }
     ];
+  }
+
+  private async callImageGenWithSpec(spec: ModelSpec, prompt: string, base64Image: string, referenceImages: string[]): Promise<string | null> {
+    const parts = this.buildImageParts(prompt, base64Image, referenceImages);
     const res = await this.ai.models.generateContent({ model: spec.model, contents: [{ role: 'user', parts }], config: { temperature: spec.temperature, topP: spec.topP, topK: spec.topK } });
     for (const part of res.candidates[0].content.parts) {
       if (part.inlineData) return `data:image/png;base64,${part.inlineData.data}`;
     }
     return null;
+  }
+
+  async callImageGen(prompt: string, base64Image: string, referenceImages: string[] = []): Promise<string | null> {
+    const spec = this.getSpec('IMAGE_GEN');
+    return this.callImageGenWithSpec(spec, prompt, base64Image, referenceImages);
+  }
+
+  async callImageGenWithMode(mode: Mode, prompt: string, base64Image: string, referenceImages: string[] = []): Promise<string | null> {
+    const spec = this.getSpecForMode(mode, 'IMAGE_GEN');
+    if (!spec) return null;
+    return this.callImageGenWithSpec(spec, prompt, base64Image, referenceImages);
   }
 }
