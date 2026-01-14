@@ -57,26 +57,132 @@ export class LLMRouter {
     return parts.map((part: { text?: string }) => part.text).filter(Boolean).join("\n");
   }
 
+  private recordTrace(
+    agentId: AgentId,
+    spec: ModelSpec,
+    attempt: number,
+    durationMs: number,
+    ok: boolean,
+    error?: string,
+    modeOverride?: Mode
+  ) {
+    this.traces.push({
+      agent: agentId,
+      mode: modeOverride || this.mode,
+      model: spec.model,
+      temperature: spec.temperature,
+      responseMimeType: spec.responseMimeType,
+      retriesUsed: attempt,
+      durationMs,
+      ok,
+      error
+    });
+  }
+
+  private async withRetries<T>(
+    agentId: AgentId,
+    spec: ModelSpec,
+    action: () => Promise<T>,
+    isValid: (result: T) => boolean = () => true,
+    modeOverride?: Mode
+  ): Promise<T> {
+    const attempts = Math.max(1, spec.retries || 1);
+    let lastError: unknown = null;
+
+    for (let attempt = 0; attempt < attempts; attempt++) {
+      const start = performance.now();
+      try {
+        const result = await action();
+        if (!isValid(result)) {
+          throw new Error(`[LLMRouter] Invalid response for ${agentId}`);
+        }
+        const durationMs = Math.round(performance.now() - start);
+        this.recordTrace(agentId, spec, attempt, durationMs, true, undefined, modeOverride);
+        return result;
+      } catch (error) {
+        const durationMs = Math.round(performance.now() - start);
+        const message = error instanceof Error ? error.message : String(error);
+        this.recordTrace(agentId, spec, attempt, durationMs, false, message, modeOverride);
+        lastError = error;
+      }
+    }
+
+    throw lastError;
+  }
+
   async callJson<T>(agentId: AgentId, contents: any[], systemInstruction: string, schema: any): Promise<T> {
     const spec = this.getSpec(agentId);
-    const res = await this.ai.models.generateContent({
-      model: spec.model,
-      contents,
-      config: { temperature: spec.temperature, responseMimeType: 'application/json', responseSchema: schema, systemInstruction, tools: spec.tools }
-    });
-    this.traces.push({ agent: agentId, mode: this.mode, model: spec.model, temperature: spec.temperature, retriesUsed: 0, durationMs: 0, ok: true });
-    const text = this.extractTextFromResponse(res);
-    if (!text) {
-      throw new Error(`[LLMRouter] Empty JSON response for ${agentId}`);
-    }
-    return JSON.parse(text.replace(/```json/g, '').replace(/```/g, '').trim()) as T;
+    return this.withRetries(
+      agentId,
+      spec,
+      async () => {
+        const res = await this.ai.models.generateContent({
+          model: spec.model,
+          contents,
+          config: { temperature: spec.temperature, responseMimeType: 'application/json', responseSchema: schema, systemInstruction, tools: spec.tools }
+        });
+        const text = this.extractTextFromResponse(res);
+        if (!text) {
+          throw new Error(`[LLMRouter] Empty JSON response for ${agentId}`);
+        }
+        return JSON.parse(text.replace(/```json/g, '').replace(/```/g, '').trim()) as T;
+      }
+    );
   }
 
   async callText(agentId: AgentId, contents: any[], systemInstruction: string): Promise<string> {
     const spec = this.getSpec(agentId);
-    const res = await this.ai.models.generateContent({ model: spec.model, contents, config: { temperature: spec.temperature, systemInstruction } });
-    this.traces.push({ agent: agentId, mode: this.mode, model: spec.model, temperature: spec.temperature, retriesUsed: 0, durationMs: 0, ok: true });
-    return this.extractTextFromResponse(res);
+    return this.withRetries(
+      agentId,
+      spec,
+      async () => {
+        const res = await this.ai.models.generateContent({ model: spec.model, contents, config: { temperature: spec.temperature, systemInstruction } });
+        return this.extractTextFromResponse(res);
+      },
+      (text) => Boolean(text && text.trim())
+    );
+  }
+
+  async callTextWithMode(mode: Mode, agentId: AgentId, contents: any[], systemInstruction: string): Promise<string> {
+    const spec = this.getSpecForMode(mode, agentId);
+    if (!spec) {
+      throw new Error(`[LLMRouter] Missing model spec for ${mode}:${agentId}`);
+    }
+    return this.withRetries(
+      agentId,
+      spec,
+      async () => {
+        const res = await this.ai.models.generateContent({ model: spec.model, contents, config: { temperature: spec.temperature, systemInstruction } });
+        return this.extractTextFromResponse(res);
+      },
+      (text) => Boolean(text && text.trim()),
+      mode
+    );
+  }
+
+  async callJsonWithMode<T>(mode: Mode, agentId: AgentId, contents: any[], systemInstruction: string, schema: any): Promise<T> {
+    const spec = this.getSpecForMode(mode, agentId);
+    if (!spec) {
+      throw new Error(`[LLMRouter] Missing model spec for ${mode}:${agentId}`);
+    }
+    return this.withRetries(
+      agentId,
+      spec,
+      async () => {
+        const res = await this.ai.models.generateContent({
+          model: spec.model,
+          contents,
+          config: { temperature: spec.temperature, responseMimeType: 'application/json', responseSchema: schema, systemInstruction, tools: spec.tools }
+        });
+        const text = this.extractTextFromResponse(res);
+        if (!text) {
+          throw new Error(`[LLMRouter] Empty JSON response for ${agentId}`);
+        }
+        return JSON.parse(text.replace(/```json/g, '').replace(/```/g, '').trim()) as T;
+      },
+      undefined,
+      mode
+    );
   }
 
   private buildImageParts(prompt: string, base64Image: string, referenceImages: string[]) {
@@ -90,23 +196,38 @@ export class LLMRouter {
     ];
   }
 
-  private async callImageGenWithSpec(spec: ModelSpec, prompt: string, base64Image: string, referenceImages: string[]): Promise<string | null> {
-    const parts = this.buildImageParts(prompt, base64Image, referenceImages);
-    const res = await this.ai.models.generateContent({ model: spec.model, contents: [{ role: 'user', parts }], config: { temperature: spec.temperature, topP: spec.topP, topK: spec.topK } });
-    for (const part of res.candidates[0].content.parts) {
-      if (part.inlineData) return `data:image/png;base64,${part.inlineData.data}`;
-    }
-    return null;
+  private async callImageGenWithSpec(
+    agentId: AgentId,
+    spec: ModelSpec,
+    prompt: string,
+    base64Image: string,
+    referenceImages: string[],
+    modeOverride?: Mode
+  ): Promise<string | null> {
+    return this.withRetries(
+      agentId,
+      spec,
+      async () => {
+        const parts = this.buildImageParts(prompt, base64Image, referenceImages);
+        const res = await this.ai.models.generateContent({ model: spec.model, contents: [{ role: 'user', parts }], config: { temperature: spec.temperature, topP: spec.topP, topK: spec.topK } });
+        for (const part of res.candidates[0].content.parts) {
+          if (part.inlineData) return `data:image/png;base64,${part.inlineData.data}`;
+        }
+        return null;
+      },
+      (image) => Boolean(image),
+      modeOverride
+    );
   }
 
   async callImageGen(prompt: string, base64Image: string, referenceImages: string[] = []): Promise<string | null> {
     const spec = this.getSpec('IMAGE_GEN');
-    return this.callImageGenWithSpec(spec, prompt, base64Image, referenceImages);
+    return this.callImageGenWithSpec('IMAGE_GEN', spec, prompt, base64Image, referenceImages);
   }
 
   async callImageGenWithMode(mode: Mode, prompt: string, base64Image: string, referenceImages: string[] = []): Promise<string | null> {
     const spec = this.getSpecForMode(mode, 'IMAGE_GEN');
     if (!spec) return null;
-    return this.callImageGenWithSpec(spec, prompt, base64Image, referenceImages);
+    return this.callImageGenWithSpec('IMAGE_GEN', spec, prompt, base64Image, referenceImages, mode);
   }
 }
