@@ -50,6 +50,13 @@ export class LLMRouter {
   public getSpec(agentId: AgentId): ModelSpec { return MODEL_MATRIX[this.mode][agentId]!; }
   public getSpecForMode(mode: Mode, agentId: AgentId): ModelSpec | null { return MODEL_MATRIX[mode][agentId]; }
 
+  private extractTextFromResponse(res: any): string {
+    if (res?.text) return res.text;
+    const parts = res?.candidates?.[0]?.content?.parts;
+    if (!parts) return "";
+    return parts.map((part: { text?: string }) => part.text).filter(Boolean).join("\n");
+  }
+
   async callJson<T>(agentId: AgentId, contents: any[], systemInstruction: string, schema: any): Promise<T> {
     const spec = this.getSpec(agentId);
     const res = await this.ai.models.generateContent({
@@ -58,14 +65,18 @@ export class LLMRouter {
       config: { temperature: spec.temperature, responseMimeType: 'application/json', responseSchema: schema, systemInstruction, tools: spec.tools }
     });
     this.traces.push({ agent: agentId, mode: this.mode, model: spec.model, temperature: spec.temperature, retriesUsed: 0, durationMs: 0, ok: true });
-    return JSON.parse(res.text.replace(/```json/g, '').replace(/```/g, '').trim()) as T;
+    const text = this.extractTextFromResponse(res);
+    if (!text) {
+      throw new Error(`[LLMRouter] Empty JSON response for ${agentId}`);
+    }
+    return JSON.parse(text.replace(/```json/g, '').replace(/```/g, '').trim()) as T;
   }
 
   async callText(agentId: AgentId, contents: any[], systemInstruction: string): Promise<string> {
     const spec = this.getSpec(agentId);
     const res = await this.ai.models.generateContent({ model: spec.model, contents, config: { temperature: spec.temperature, systemInstruction } });
     this.traces.push({ agent: agentId, mode: this.mode, model: spec.model, temperature: spec.temperature, retriesUsed: 0, durationMs: 0, ok: true });
-    return res.text || "";
+    return this.extractTextFromResponse(res);
   }
 
   private buildImageParts(prompt: string, base64Image: string, referenceImages: string[]) {
