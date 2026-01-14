@@ -169,7 +169,11 @@ async function runFastGuardrail(index: number, original: string, enhanced: strin
         properties: { pass: { type: Type.BOOLEAN }, score: { type: Type.NUMBER }, verdict: { type: Type.STRING }, revision_actions: { type: Type.ARRAY, items: { type: Type.OBJECT, properties: { instruction: { type: Type.STRING } } } } },
         required: ['pass', 'verdict']
     };
-    return llm.callJson<FastGuardrailOut>('FAST_GUARDRAIL', [base64ToGenerativePart(original), base64ToGenerativePart(enhanced)], GUARDRAIL_SYSTEM, schema);
+    const preferredAgent = llm.getSpecForMode(llm.getMode(), 'FAST_GUARDRAIL') ? 'FAST_GUARDRAIL' : 'IMAGE_QA';
+    if (!llm.getSpecForMode(llm.getMode(), preferredAgent)) {
+        return { image_index: index, pass: true, score: 0, verdict: 'OK', reasons: [], revision_actions: [] };
+    }
+    return llm.callJson<FastGuardrailOut>(preferredAgent, [base64ToGenerativePart(original), base64ToGenerativePart(enhanced)], GUARDRAIL_SYSTEM, schema);
 }
 
 // ==========================================

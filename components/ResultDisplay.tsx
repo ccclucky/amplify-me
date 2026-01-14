@@ -26,6 +26,20 @@ interface MockupData {
   lang: string;
 }
 
+const normalizeEnhancedImage = (image?: string | null): string | null => {
+  if (!image) return null;
+  if (image.startsWith('data:image/')) return image;
+  if (image.startsWith('data:')) return image;
+  if (image.startsWith('blob:') || image.startsWith('http')) return image;
+  if (/^[A-Za-z0-9+/=]+$/.test(image)) {
+    return `data:image/png;base64,${image}`;
+  }
+  return image;
+};
+
+const normalizeEnhancedImages = (images?: string[]): string[] | undefined =>
+  images?.map((image) => normalizeEnhancedImage(image) || '');
+
 // ==========================================
 // Helper: WeChat Authentic Image Grid
 // ==========================================
@@ -42,11 +56,12 @@ const WeChatImageGrid: React.FC<{
 }) => {
   if (!images || images.length === 0) return null;
 
-  const displayImages = images.map((original, i) => enhancedImages?.[i] || original);
+  const normalizedEnhanced = normalizeEnhancedImages(enhancedImages);
+  const displayImages = images.map((original, i) => normalizedEnhanced?.[i] || original);
   const count = displayImages.length;
 
   const EnhancedBadge = ({ idx }: { idx: number }) =>
-    enhancedImages && enhancedImages[idx] && enhancedImages[idx] !== images[idx] ? (
+    normalizedEnhanced && normalizedEnhanced[idx] && normalizedEnhanced[idx] !== images[idx] ? (
       <div className="absolute top-1 left-1 bg-purple-500/90 backdrop-blur-sm text-white text-[8px] px-1 py-0.5 rounded-[3px] shadow-sm z-10 flex items-center gap-1 font-semibold tracking-wider uppercase opacity-90 pointer-events-none">
         AI
       </div>
@@ -112,10 +127,11 @@ const XHSImageGrid: React.FC<{
   
   if (!images || images.length === 0) return null;
 
-  const displayImages = images.map((original, i) => enhancedImages?.[i] || original);
+  const normalizedEnhanced = normalizeEnhancedImages(enhancedImages);
+  const displayImages = images.map((original, i) => normalizedEnhanced?.[i] || original);
   const total = displayImages.length;
 
-  const isCurrentEnhanced = enhancedImages && enhancedImages[activeIndex] && enhancedImages[activeIndex] !== images[activeIndex];
+  const isCurrentEnhanced = normalizedEnhanced && normalizedEnhanced[activeIndex] && normalizedEnhanced[activeIndex] !== images[activeIndex];
 
   const handlePrev = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -416,9 +432,10 @@ export const ResultDisplay: React.FC<ResultDisplayProps> = ({
   };
 
   const handleDownloadImage = () => {
-    if (!activeVariant?.enhanced_images_base64?.[activeImageIndex]) return;
+    const normalized = normalizeEnhancedImage(activeVariant?.enhanced_images_base64?.[activeImageIndex]);
+    if (!normalized) return;
     const link = document.createElement('a');
-    link.href = activeVariant.enhanced_images_base64[activeImageIndex];
+    link.href = normalized;
     link.download = `AmplifyMe_Enhanced_${Date.now()}_${activeImageIndex}.png`;
     document.body.appendChild(link);
     link.click();
@@ -447,9 +464,10 @@ export const ResultDisplay: React.FC<ResultDisplayProps> = ({
   };
   
   // Determine if we are in enhanced mode (Quality mode or user processed images)
-  const isVariantEnhanced = activeVariant?.enhanced_images_base64 && 
-                            activeVariant.enhanced_images_base64.length > 0 &&
-                            activeVariant.enhanced_images_base64[0].startsWith('data:image/'); // Basic check
+  const normalizedEnhancedImages = normalizeEnhancedImages(activeVariant?.enhanced_images_base64);
+  const isVariantEnhanced = normalizedEnhancedImages &&
+                            normalizedEnhancedImages.length > 0 &&
+                            normalizedEnhancedImages[0].startsWith('data:image/'); // Basic check
 
   const resultMockupData: MockupData | null = activeVariant
     ? {
@@ -461,7 +479,7 @@ export const ResultDisplay: React.FC<ResultDisplayProps> = ({
         tags: activeVariant.copy.hash_tags,
         date: '1m ago',
         isEnhanced: isVariantEnhanced || false,
-        enhancedImages: activeVariant.enhanced_images_base64,
+        enhancedImages: normalizedEnhancedImages,
         lang: lang
       }
     : null;
