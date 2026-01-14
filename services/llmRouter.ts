@@ -48,6 +48,7 @@ export class LLMRouter {
   public getMode(): Mode { return this.mode; }
   public getTraces(): LLMTraceRecord[] { return this.traces; }
   public getSpec(agentId: AgentId): ModelSpec { return MODEL_MATRIX[this.mode][agentId]!; }
+  public getSpecForMode(mode: Mode, agentId: AgentId): ModelSpec | null { return MODEL_MATRIX[mode][agentId]; }
 
   async callJson<T>(agentId: AgentId, contents: any[], systemInstruction: string, schema: any): Promise<T> {
     const spec = this.getSpec(agentId);
@@ -67,20 +68,34 @@ export class LLMRouter {
     return res.text || "";
   }
 
-  async callImageGen(prompt: string, base64Image: string, referenceImages: string[] = []): Promise<string | null> {
-    const spec = this.getSpec('IMAGE_GEN');
+  private buildImageParts(prompt: string, base64Image: string, referenceImages: string[]) {
     const referenceParts = referenceImages.map((image) => ({
       inlineData: { mimeType: 'image/png', data: image.split(',')[1] }
     }));
-    const parts = [
+    return [
       { inlineData: { mimeType: 'image/png', data: base64Image.split(',')[1] } },
       ...referenceParts,
       { text: prompt }
     ];
+  }
+
+  private async callImageGenWithSpec(spec: ModelSpec, prompt: string, base64Image: string, referenceImages: string[]): Promise<string | null> {
+    const parts = this.buildImageParts(prompt, base64Image, referenceImages);
     const res = await this.ai.models.generateContent({ model: spec.model, contents: [{ role: 'user', parts }], config: { temperature: spec.temperature, topP: spec.topP, topK: spec.topK } });
     for (const part of res.candidates[0].content.parts) {
       if (part.inlineData) return `data:image/png;base64,${part.inlineData.data}`;
     }
     return null;
+  }
+
+  async callImageGen(prompt: string, base64Image: string, referenceImages: string[] = []): Promise<string | null> {
+    const spec = this.getSpec('IMAGE_GEN');
+    return this.callImageGenWithSpec(spec, prompt, base64Image, referenceImages);
+  }
+
+  async callImageGenWithMode(mode: Mode, prompt: string, base64Image: string, referenceImages: string[] = []): Promise<string | null> {
+    const spec = this.getSpecForMode(mode, 'IMAGE_GEN');
+    if (!spec) return null;
+    return this.callImageGenWithSpec(spec, prompt, base64Image, referenceImages);
   }
 }

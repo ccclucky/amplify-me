@@ -204,7 +204,8 @@ export async function runOrchestrator(req: UserRequest): Promise<OrchestratorRes
                 if (!guard.pass) {
                     console.warn(`[V3 RESCUE] Rejecting hallucinations/weakness. Retrying with STRICT PHYSICS.`);
                     const rescuePrompt = plan.nano_prompt_en_v2 + "\n[STRICT]: ELIMINATE ALL FLOATING DOTS. Deepen shadows to black. Make the screen light the ONLY light.";
-                    const rescueImg = await llm.callImageGen(rescuePrompt, originalBase64[i], referenceBase64);
+                    const rescueMode = llm.getMode() === 'fast' ? 'quality' : llm.getMode();
+                    const rescueImg = await llm.callImageGenWithMode(rescueMode, rescuePrompt, originalBase64[i], referenceBase64);
                     if (rescueImg) resultImg = rescueImg;
                 }
             }
