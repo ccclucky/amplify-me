@@ -14,7 +14,9 @@ interface InputFormProps {
 
 export const InputForm: React.FC<InputFormProps> = ({ request, onChange, onSubmit, onReset, isLoading, hasResult }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const referenceInputRef = useRef<HTMLInputElement>(null);
   const [previewUrls, setPreviewUrls] = useState<string[]>([]);
+  const [referencePreviewUrls, setReferencePreviewUrls] = useState<string[]>([]);
   const lang = request.language || 'en';
   const t = translations[lang];
 
@@ -22,6 +24,7 @@ export const InputForm: React.FC<InputFormProps> = ({ request, onChange, onSubmi
   useEffect(() => {
     return () => {
       previewUrls.forEach(url => URL.revokeObjectURL(url));
+      referencePreviewUrls.forEach(url => URL.revokeObjectURL(url));
     };
   }, []);
 
@@ -35,6 +38,16 @@ export const InputForm: React.FC<InputFormProps> = ({ request, onChange, onSubmi
       newUrls.forEach(url => URL.revokeObjectURL(url));
     };
   }, [request.images]);
+
+  // Update preview URLs whenever request.reference_images changes
+  useEffect(() => {
+    const newUrls = (request.reference_images || []).map(file => URL.createObjectURL(file));
+    setReferencePreviewUrls(newUrls);
+
+    return () => {
+      newUrls.forEach(url => URL.revokeObjectURL(url));
+    };
+  }, [request.reference_images]);
 
   const handleTextChange = (e: ChangeEvent<HTMLTextAreaElement>) => {
     onChange({ ...request, raw_text: e.target.value });
@@ -65,10 +78,23 @@ export const InputForm: React.FC<InputFormProps> = ({ request, onChange, onSubmi
     }
   };
 
+  const handleReferenceSelect = (e: ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files) {
+      processReferenceFiles(Array.from(e.target.files));
+    }
+  };
+
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
     if (e.dataTransfer.files) {
       processFiles(Array.from(e.dataTransfer.files));
+    }
+  };
+
+  const handleReferenceDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    if (e.dataTransfer.files) {
+      processReferenceFiles(Array.from(e.dataTransfer.files));
     }
   };
 
@@ -78,20 +104,40 @@ export const InputForm: React.FC<InputFormProps> = ({ request, onChange, onSubmi
     onChange({ ...request, images: combinedFiles });
   };
 
+  const processReferenceFiles = (newFiles: File[]) => {
+    const validFiles = newFiles.filter(f => f.type.startsWith('image/'));
+    const existing = request.reference_images || [];
+    const combinedFiles = [...existing, ...validFiles].slice(0, 3); // Max 3 reference images
+    onChange({ ...request, reference_images: combinedFiles });
+  };
+
   const removeImage = (index: number) => {
     const newImages = [...request.images];
     newImages.splice(index, 1);
     onChange({ ...request, images: newImages });
   };
 
+  const removeReferenceImage = (index: number) => {
+    const newImages = [...(request.reference_images || [])];
+    newImages.splice(index, 1);
+    onChange({ ...request, reference_images: newImages });
+  };
+
   const triggerFileUpload = () => {
     fileInputRef.current?.click();
+  };
+
+  const triggerReferenceUpload = () => {
+    referenceInputRef.current?.click();
   };
 
   const clearAll = () => {
     if (confirm(t.confirm_clear)) {
         if (fileInputRef.current) {
             fileInputRef.current.value = '';
+        }
+        if (referenceInputRef.current) {
+            referenceInputRef.current.value = '';
         }
         onReset();
     }
@@ -186,6 +232,56 @@ export const InputForm: React.FC<InputFormProps> = ({ request, onChange, onSubmi
               <div 
                 onClick={triggerFileUpload}
                 className="aspect-square rounded-lg border-2 border-dashed border-gray-200 flex items-center justify-center cursor-pointer hover:bg-purple-50 hover:border-purple-200 transition-all text-gray-300 hover:text-purple-400"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4"/></svg>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Reference Images */}
+      <div>
+        <label className="block text-sm font-bold text-gray-700 mb-2 flex items-center gap-2">
+            {t.step_ref}
+            <span className="text-[10px] font-normal text-gray-400 px-2 py-0.5 bg-gray-50 rounded-full">{t.step_ref_sub}</span>
+        </label>
+        <input
+          type="file"
+          ref={referenceInputRef}
+          className="hidden"
+          multiple
+          accept="image/*"
+          onChange={handleReferenceSelect}
+        />
+
+        {referencePreviewUrls.length === 0 ? (
+          <div
+            onDrop={handleReferenceDrop}
+            onDragOver={(e) => e.preventDefault()}
+            onClick={triggerReferenceUpload}
+            className="border-2 border-dashed border-gray-100 rounded-2xl p-6 flex flex-col items-center justify-center bg-gray-50/50 hover:bg-indigo-50 hover:border-indigo-200 transition-all cursor-pointer min-h-[110px] group"
+          >
+            <div className="group-hover:scale-110 transition-transform duration-300">{iconUpload}</div>
+            <span className="text-xs text-gray-400 mt-2">{t.drag_drop}</span>
+          </div>
+        ) : (
+          <div className="grid grid-cols-3 gap-2 animate-fade-in">
+            {referencePreviewUrls.map((url, idx) => (
+              <div key={idx} className="relative aspect-square rounded-lg overflow-hidden group border border-gray-100 bg-gray-50">
+                <img src={url} alt={`reference ${idx}`} className="w-full h-full object-cover" />
+                <button
+                  onClick={() => removeReferenceImage(idx)}
+                  className="absolute top-1 right-1 w-5 h-5 flex items-center justify-center bg-black/40 text-white rounded-full hover:bg-red-500 transition-all opacity-0 group-hover:opacity-100"
+                >
+                  &times;
+                </button>
+              </div>
+            ))}
+            {(request.reference_images || []).length < 3 && (
+              <div
+                onClick={triggerReferenceUpload}
+                className="aspect-square rounded-lg border-2 border-dashed border-gray-200 flex items-center justify-center cursor-pointer hover:bg-indigo-50 hover:border-indigo-200 transition-all text-gray-300 hover:text-indigo-400"
               >
                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4"/></svg>
               </div>
