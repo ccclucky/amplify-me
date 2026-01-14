@@ -46,8 +46,11 @@ export const translations = {
     copy_btn: "Copy Text",
     copied: "Copied",
     save_img: "Save Image",
+    actions_title: "Quick Actions",
     generating: "Generating...",
     refine_placeholder: "Refine text or image...",
+    refine_title: "Refine",
+    refine_hint: "Tip: focus on tone or lighting",
     refine_modes: {
       more_literary: "Literary",
       more_realistic: "Realistic",
@@ -105,8 +108,11 @@ export const translations = {
     copy_btn: "复制文案",
     copied: "已复制",
     save_img: "保存图片",
+    actions_title: "快捷操作",
     generating: "生成中...",
     refine_placeholder: "想怎么改图或文案？",
+    refine_title: "微调",
+    refine_hint: "可描述语气或光影",
     refine_modes: {
       more_literary: "更文艺",
       more_realistic: "更真实",
